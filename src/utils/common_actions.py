@@ -1,11 +1,15 @@
 """
 Consists of common actions utilized across the App
 """
-import time
-
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, \
+    ElementClickInterceptedException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 
 from src.utils import constants
 
@@ -18,48 +22,45 @@ class Utilities:
             'xpath': self.driver.find_element_by_xpath,
             'css': self.driver.find_element_by_css_selector
         }
-        default = self.driver.find_element_by_xpath
+        self.by_locator = {
+            'name': By.CLASS_NAME,
+            'xpath': By.XPATH,
+            'css': By.CSS_SELECTOR
+        }
         self.actions = ActionChains(self.driver)
 
     def click_activity(self, element: str, locator_type: str = 'xpath'):
-        # TODO Add wait element before clicking, dynamic wait
-        self.driver.implicitly_wait(constants.MAX_WAIT_TIME)
-        _click_element = self.locator.get(locator_type.lower(), None)(element)
-        # self.bring_element_in_viewport(element=_click_element)
+        _click_element = self.get_exp_wait_element(element=element, locator_type=locator_type)
         _click_element.click()
 
     def enter_text_(self, element: str, locator_type: str = 'xpath', text="hello"):
-        # TODO Add wait element before clicking, dynamic wait
         self.click_activity(element=element, locator_type=locator_type)
         input_element = self.locator.get(locator_type.lower(), None)(element)
         input_element.clear()
         input_element.send_keys(text)
 
     def slider_action(self, element: str, locator_type: str = 'xpath', h_value=0, v_value=0):
-        # TODO Add wait element before clicking, dynamic wait
-        slider_element = self.locator.get(locator_type.lower(), None)(element)
+        slider_element = self.get_exp_wait_element(element=element, locator_type=locator_type)
         self.bring_element_in_viewport(element=slider_element)
         self.actions.drag_and_drop_by_offset(source=slider_element, xoffset=h_value, yoffset=v_value).perform()
 
     def bring_element_in_viewport(self, element: WebElement):
-        if isinstance(element,str):
-            element = self.locator.get('xpath')(element)
-        skip_height = int(self.get_elem_attr(element="//div[@id='listingView']", attr_type='offsetHeight'))
-        self.driver.execute_script(f"arguments[0].scrollIntoView();window.scrollBy(0,{-1.5*skip_height})", element)
-        time.sleep(constants.SCROLL_VIEWPORT_WAIT)
-        self.actions.move_to_element(element)
-        time.sleep(constants.SCROLL_VIEWPORT_WAIT - 1)
+        if isinstance(element, str):
+            element = self.get_exp_wait_element(element=element)
+        skip_height = int(self.get_elem_attr(element="//div[@class='headerOuter']", attr_type='offsetHeight')) + 50
+        self.driver.execute_script(f"arguments[0].scrollIntoView();window.scrollBy(0,{-skip_height})", element)
+        self.wait_()
 
     def element_enabled(self, element: str, locator_type: str = 'xpath'):
-        element = self.locator.get(locator_type.lower())(element)
+        element = self.get_exp_wait_element(element=element, locator_type=locator_type)
         return element.is_enabled()
 
     def element_displayed(self, element: str, locator_type: str = 'xpath'):
-        element = self.locator.get(locator_type.lower())(element)
+        element = self.get_exp_wait_element(element=element, locator_type=locator_type)
         return element.is_displayed()
 
     def element_selected(self, element: str, locator_type: str = 'xpath'):
-        element = self.locator.get(locator_type.lower())(element)
+        element = self.get_exp_wait_element(element=element, locator_type=locator_type)
         return element.is_selected()
 
     def clear_overlay(self, element: str, locator_type: str = 'xpath'):
@@ -67,5 +68,17 @@ class Utilities:
             self.click_activity(element=element, locator_type=locator_type)
 
     def get_elem_attr(self, element: str, locator_type: str = 'xpath', attr_type='innerText') -> str:
-        element = self.locator.get(locator_type.lower(), None)(element)
+        element = self.get_exp_wait_element(element=element, locator_type=locator_type)
         return element.get_attribute(attr_type)
+
+    def wait_(self, max_wait=constants.SCROLL_VIEWPORT_WAIT):
+        self.driver.implicitly_wait(max_wait)
+
+    def get_exp_wait_element(self, element: str, locator_type: str = 'xpath'):
+        ignored_exceptions = (NoSuchElementException, StaleElementReferenceException, ElementClickInterceptedException,)
+        return WebDriverWait(self.driver, constants.MAX_WAIT_TIME, ignored_exceptions=ignored_exceptions).until(
+            EC.presence_of_element_located((self.by_locator.get(locator_type.lower(), None), element)))
+
+    def scroll_and_click(self, element: str, locator_type: str = 'xpath'):
+        element = self.get_exp_wait_element(element, locator_type)
+        self.actions.click(on_element=element).perform()

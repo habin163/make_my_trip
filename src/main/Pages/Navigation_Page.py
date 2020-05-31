@@ -14,10 +14,12 @@ _icon_close_popup = "//span[contains(@data-cy,'modalClose')]"
 
 class NavigationPage:
     def __init__(self, driver):
-        self.driver: WebDriver = driver
+        self.driver = driver
+
         self.utils = Utilities(self.driver)
         self.clicks = self.utils.click_activity
         self.inputs = self.utils.enter_text_
+        self.scroll_click = self.utils.scroll_and_click
 
     def select_hotel(self):
         self.login()
